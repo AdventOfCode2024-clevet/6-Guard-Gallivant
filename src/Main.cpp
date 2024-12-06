@@ -1,8 +1,8 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <set>
 #include <tuple>
-#include <unistd.h>
 
 enum Orientation
 {
@@ -11,6 +11,43 @@ enum Orientation
     LEFTWARDS = '<',
     RIGHTWARDS = '>'
 };
+
+bool simulateGuard(std::vector<std::string> grid, int startI, int startJ, Orientation startOrientation) {
+    int i = startI, j = startJ;
+    Orientation orientation = startOrientation;
+    std::set<std::tuple<int, int, Orientation>> visited;
+
+    while (i >= 0 && i < grid.size() && j >= 0 && j < grid[i].size()) {
+        if (visited.count({i, j, orientation})) {
+            return (true);
+        }
+        visited.insert({i, j, orientation});
+
+        int di = 0, dj = 0;
+        switch (orientation) {
+            case UPWARDS: di = -1; break;
+            case DOWNWARDS: di = 1; break;
+            case LEFTWARDS: dj = -1; break;
+            case RIGHTWARDS: dj = 1; break;
+        }
+
+        int ni = i + di, nj = j + dj;
+        if (ni >= 0 && ni < grid.size() && nj >= 0 && nj < grid[ni].size() && (grid[ni][nj] == '#' || grid[ni][nj] == 'O')) {
+            switch (orientation) {
+                case UPWARDS: orientation = RIGHTWARDS; break;
+                case RIGHTWARDS: orientation = DOWNWARDS; break;
+                case DOWNWARDS: orientation = LEFTWARDS; break;
+                case LEFTWARDS: orientation = UPWARDS; break;
+            }
+            continue;
+        }
+
+        i = ni;
+        j = nj;
+    }
+
+    return (false);
+}
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -24,80 +61,42 @@ int main(int argc, char* argv[]) {
         return (1);
     }
 
-    std::vector<std::string> lines;
+    std::vector<std::string> grid;
     std::string line;
     while (std::getline(input, line)) {
-        lines.push_back(line);
+        grid.push_back(line);
     }
 
-    // We first need to find the guard in the grid (could be any orientation)
     std::tuple<int, int, Orientation> guard;
-    for (int i = 0; i < lines.size(); i++) {
-        for (int j = 0; j < lines[i].size(); j++) {
-            if (lines[i][j] == UPWARDS || lines[i][j] == DOWNWARDS || lines[i][j] == LEFTWARDS || lines[i][j] == RIGHTWARDS) {
-                guard = std::make_tuple(i, j, static_cast<Orientation>(lines[i][j]));
+    for (int i = 0; i < grid.size(); i++) {
+        for (int j = 0; j < grid[i].size(); j++) {
+            if (grid[i][j] == UPWARDS || grid[i][j] == DOWNWARDS || grid[i][j] == LEFTWARDS || grid[i][j] == RIGHTWARDS) {
+                guard = {i, j, static_cast<Orientation>(grid[i][j])};
                 break;
             }
         }
     }
 
-    // std::cout << "Guard found at: " << std::get<0>(guard) << ", " << std::get<1>(guard) << std::endl;
+    int startI = std::get<0>(guard);
+    int startJ = std::get<1>(guard);
+    Orientation startOrientation = std::get<2>(guard);
 
-    // Now we can start moving the guard, each time the guard lives a cell, the cell becomes an 'X'
-    // Each time the guard encounters '#', it rotates 90 degrees to the right
-    // We do this until the guard exits the grid
-    int i = std::get<0>(guard);
-    int j = std::get<1>(guard);
-    Orientation orientation = std::get<2>(guard);
-
-    while (i >= 0 && i < lines.size() && j >= 0 && j < lines[i].size()) {
-        // std::cout << "Current position: (" << i << ", " << j << "), Orientation: " << orientation << std::endl;
-
-        int di = 0, dj = 0;
-        switch (orientation) {
-            case UPWARDS: di = -1; break;
-            case DOWNWARDS: di = 1; break;
-            case LEFTWARDS: dj = -1; break;
-            case RIGHTWARDS: dj = 1; break;
-        }
-
-        // Vérifiez les limites avant d'accéder à `lines`
-        int ni = i + di, nj = j + dj;
-        if (ni >= 0 && ni < lines.size() && nj >= 0 && nj < lines[ni].size() && lines[ni][nj] == '#') {
-            // std::cout << "Obstacle at (" << ni << ", " << nj << "). Rotating..." << std::endl;
-            switch (orientation) {
-                case UPWARDS: orientation = RIGHTWARDS; break;
-                case RIGHTWARDS: orientation = DOWNWARDS; break;
-                case DOWNWARDS: orientation = LEFTWARDS; break;
-                case LEFTWARDS: orientation = UPWARDS; break;
+    int validPositions = 0;
+    int iterations = 0;
+    for (int i = 0; i < grid.size(); i++) {
+        for (int j = 0; j < grid[i].size(); j++) {
+            if (grid[i][j] != '.' || (i == startI && j == startJ)) {
+                continue;
             }
-            continue;
-        }
 
-        // Déplacement
-        i = ni;
-        j = nj;
-
-        // Assurez-vous que la cellule est dans les limites avant de modifier
-        if (i >= 0 && i < lines.size() && j >= 0 && j < lines[i].size()) {
-            // std::cout << "Marking (" << i << ", " << j << ") as visited" << std::endl;
-            lines[i][j] = 'X';
+            grid[i][j] = 'O';
+            if (simulateGuard(grid, startI, startJ, startOrientation)) {
+                validPositions++;
+            }
+            grid[i][j] = '.';
         }
     }
 
-    // std::cout << "Guard exited at: " << i << ", " << j << std::endl;
-
-    // Result is the number of cells visited
-    int result = 0;
-    for (const auto& line : lines) {
-        for (const auto& cell : line) {
-            if (cell == 'X') {
-                result++;
-            }
-        }
-    }
-
-    std::cout << "Result: " << result << std::endl;
-
-    return (0);
+    std::cout << "Result: " << validPositions << std::endl;
+    return 0;
 }
